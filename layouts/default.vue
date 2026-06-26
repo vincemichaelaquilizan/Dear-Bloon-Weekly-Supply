@@ -4,7 +4,7 @@
       <div class="max-w-6xl mx-auto px-4 sm:px-6 h-14 flex items-center justify-between">
         <NuxtLink to="/" class="flex items-center gap-2 group">
           <span class="text-2xl">🌸</span>
-          <span class="font-serif text-xl text-bloom-700 dark:text-bloom-300 group-hover:text-bloom-600 transition-colors">Bloom</span>
+          <span class="font-serif text-xl text-bloom-700 dark:text-bloom-300 group-hover:text-bloom-600 transition-colors">Dear Bloom</span>
         </NuxtLink>
         <nav class="flex items-center gap-1">
           <NuxtLink to="/" class="nav-link" active-class="nav-link-active" exact>Sessions</NuxtLink>

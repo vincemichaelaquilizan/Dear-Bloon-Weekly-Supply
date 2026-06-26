@@ -36,7 +36,78 @@
           </div>
         </div>
       </div>
-      <p class="text-xs text-gray-400 dark:text-gray-600 mt-3">
+
+      <!-- Order meta fields -->
+      <div class="mt-5 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <!-- Has Card -->
+        <div>
+          <label class="form-label">Has Card?</label>
+          <div class="flex gap-2 mt-1">
+            <button
+              v-for="opt in cardOptions"
+              :key="opt.value"
+              @click="setHasCard(opt.value)"
+              :class="[
+                'flex-1 py-2 px-3 rounded-lg text-sm font-medium border transition-colors',
+                order.hasCard === opt.value
+                  ? 'bg-bloom-500 text-white border-bloom-500'
+                  : 'bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-300 border-gray-200 dark:border-gray-700 hover:border-bloom-400'
+              ]"
+            >
+              {{ opt.label }}
+            </button>
+          </div>
+        </div>
+
+        <!-- Mode of Payment -->
+        <div>
+          <label class="form-label">Mode of Payment</label>
+          <select
+            v-model="paymentModel"
+            class="input w-full mt-1"
+            @change="savePayment"
+          >
+            <option value="">— Select —</option>
+            <option value="cash">💵 Cash</option>
+            <option value="gcash">📱 GCash</option>
+            <option value="card">💳 Card</option>
+            <option value="bank_transfer">🏦 Bank Transfer</option>
+          </select>
+        </div>
+
+        <!-- Mode of Delivery -->
+        <div>
+          <label class="form-label">Mode of Delivery</label>
+          <select
+            v-model="deliveryModel"
+            class="input w-full mt-1"
+            @change="saveDelivery"
+          >
+            <option value="">— Select —</option>
+            <option value="pickup">🛍️ Pick-up</option>
+            <option value="delivery">🚚 Delivery</option>
+            <option value="rush_delivery">⚡ Rush Delivery</option>
+          </select>
+        </div>
+
+        <!-- Client Platform -->
+        <div>
+          <label class="form-label">Client Platform</label>
+          <select
+            v-model="platformModel"
+            class="input w-full mt-1"
+            @change="savePlatform"
+          >
+            <option value="">— Select —</option>
+            <option value="walk_in">Threads</option>
+            <option value="facebook">Facebook Meta</option>
+            <option value="facebook">Tiktok</option>
+            <option value="instagram">Instagram</option>
+          </select>
+        </div>
+      </div>
+
+      <p class="text-xs text-gray-400 dark:text-gray-600 mt-4">
         Created {{ formatDate(order.createdAt) }} · Last updated {{ formatDate(order.updatedAt) }}
       </p>
     </div>
@@ -105,6 +176,7 @@ const orderId = route.params.id as string
 const ordersStore = useOrdersStore()
 const sessionsStore = useSessionsStore()
 
+// ── Data ──────────────────────────────────────────────────────
 const order = computed(() => ordersStore.getOrder(orderId))
 const totalFlowers = computed(() => order.value ? ordersStore.totalFlowers(order.value) : 0)
 const sessionName = computed(() => {
@@ -112,6 +184,7 @@ const sessionName = computed(() => {
   return sessionsStore.getSession(order.value.sessionId)?.name ?? 'Session'
 })
 
+// ── Client name ───────────────────────────────────────────────
 const clientNameModel = ref('')
 watch(order, o => { if (o) clientNameModel.value = o.clientName }, { immediate: true })
 
@@ -119,7 +192,40 @@ function saveClientName() {
   ordersStore.updateOrderName(orderId, clientNameModel.value)
 }
 
-// Edit modal
+// ── Has Card ──────────────────────────────────────────────────
+const cardOptions = [
+  { label: 'Yes', value: true as boolean | null },
+  { label: 'No',  value: false as boolean | null },
+]
+
+function setHasCard(val: boolean | null) {
+  // Toggle off if same value is clicked
+  const next = order.value?.hasCard === val ? null : val
+  ordersStore.updateOrderMeta(orderId, { hasCard: next })
+}
+
+// ── Payment ───────────────────────────────────────────────────
+const paymentModel = ref('')
+watch(order, o => { if (o) paymentModel.value = o.paymentMode }, { immediate: true })
+function savePayment() {
+  ordersStore.updateOrderMeta(orderId, { paymentMode: paymentModel.value as any })
+}
+
+// ── Delivery ──────────────────────────────────────────────────
+const deliveryModel = ref('')
+watch(order, o => { if (o) deliveryModel.value = o.deliveryMode }, { immediate: true })
+function saveDelivery() {
+  ordersStore.updateOrderMeta(orderId, { deliveryMode: deliveryModel.value as any })
+}
+
+// ── Platform ──────────────────────────────────────────────────
+const platformModel = ref('')
+watch(order, o => { if (o) platformModel.value = o.clientPlatform }, { immediate: true })
+function savePlatform() {
+  ordersStore.updateOrderMeta(orderId, { clientPlatform: platformModel.value as any })
+}
+
+// ── Edit modal ────────────────────────────────────────────────
 const showEditModal = ref(false)
 const editingItem = ref<FlowerItem | null>(null)
 
@@ -128,7 +234,7 @@ function openEditModal(item: FlowerItem) {
   showEditModal.value = true
 }
 
-// Delete item
+// ── Delete item ───────────────────────────────────────────────
 const showDeleteItem = ref(false)
 const deleteItemId = ref<string | null>(null)
 
@@ -143,6 +249,7 @@ function doDeleteItem() {
   deleteItemId.value = null
 }
 
+// ── Export ────────────────────────────────────────────────────
 function handleExport() {
   const csv = ordersStore.exportOrderToCSV(orderId)
   ordersStore.downloadCSV(csv, `bloom-order-${order.value?.clientName ?? orderId}.csv`)

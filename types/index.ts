@@ -4,11 +4,19 @@ export interface FlowerItem {
   quantity: number
 }
 
+export type PaymentMode = 'cash' | 'gcash' | 'card' | 'bank_transfer' | ''
+export type DeliveryMode = 'pickup' | 'delivery' | 'rush_delivery' | ''
+export type ClientPlatform = 'walk_in' | 'facebook' | 'instagram' | 'viber' | 'online_store' | 'other' | ''
+
 export interface Order {
   id: string
   sessionId: string    // which session this order belongs to
   clientName: string
   flowerItems: FlowerItem[]
+  hasCard: boolean | null        // does the client want a card?
+  paymentMode: PaymentMode       // mode of payment
+  deliveryMode: DeliveryMode     // mode of delivery
+  clientPlatform: ClientPlatform // where the client came from
   createdAt: string
   updatedAt: string
 }

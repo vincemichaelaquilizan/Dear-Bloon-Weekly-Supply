@@ -4,66 +4,78 @@ import type { GlobalFlower } from '~/types'
 
 const STORAGE_KEY = 'bloom_global_flowers'
 
-const DEFAULT_FLOWERS: GlobalFlower[] = [
-  { id: uuidv4(), name: 'Rose', emoji: '🌹' },
-  { id: uuidv4(), name: 'Gerbera', emoji: '🌸' },
-  { id: uuidv4(), name: 'Tulip', emoji: '🌷' },
-  { id: uuidv4(), name: 'Sunflower', emoji: '🌻' },
-  { id: uuidv4(), name: 'Lily', emoji: '💐' },
-  { id: uuidv4(), name: 'Orchid', emoji: '🌺' },
-  { id: uuidv4(), name: 'Daisy', emoji: '🌼' },
-  { id: uuidv4(), name: 'Carnation', emoji: '🌸' },
-  { id: uuidv4(), name: 'Peony', emoji: '🌸' },
-  { id: uuidv4(), name: 'Lavender', emoji: '💜' },
-]
-
 export const useFlowersStore = defineStore('flowers', () => {
   const flowers = ref<GlobalFlower[]>([])
+  const loaded = ref(false)
 
   function load() {
-    if (import.meta.client) {
-      try {
-        const raw = localStorage.getItem(STORAGE_KEY)
-        if (raw) {
-          flowers.value = JSON.parse(raw)
-        } else {
-          flowers.value = DEFAULT_FLOWERS
-          save()
-        }
-      } catch {
-        flowers.value = DEFAULT_FLOWERS
+    if (!import.meta.client || loaded.value) return
+
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY)
+
+      if (raw) {
+        flowers.value = JSON.parse(raw)
+      } else {
+        flowers.value = []
       }
+    } catch (err) {
+      console.error('Failed to load flowers:', err)
+      flowers.value = []
+    } finally {
+      loaded.value = true
     }
   }
 
   function save() {
-    if (import.meta.client) {
+    if (!import.meta.client || !loaded.value) return
+
+    try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(flowers.value))
+    } catch (err) {
+      console.error('Failed to save flowers:', err)
     }
   }
 
-  watch(flowers, save, { deep: true })
+  watch(
+    flowers,
+    () => {
+      save()
+    },
+    { deep: true }
+  )
 
   const flowerNames = computed(() => flowers.value.map(f => f.name))
 
   function findByName(name: string): GlobalFlower | undefined {
-    return flowers.value.find(f => f.name.toLowerCase() === name.toLowerCase())
+    return flowers.value.find(
+      f => f.name.toLowerCase() === name.toLowerCase()
+    )
   }
 
   function addFlower(name: string, emoji?: string): GlobalFlower {
     const normalized = toTitleCase(name)
+
     const existing = findByName(normalized)
     if (existing) return existing
-    const flower: GlobalFlower = { id: uuidv4(), name: normalized, emoji }
+
+    const flower: GlobalFlower = {
+      id: uuidv4(),
+      name: normalized,
+      emoji,
+    }
+
     flowers.value.push(flower)
+
     return flower
   }
 
   function updateFlower(id: string, patch: Partial<GlobalFlower>) {
-    const f = flowers.value.find(f => f.id === id)
-    if (!f) return
-    if (patch.name) f.name = toTitleCase(patch.name)
-    if (patch.emoji !== undefined) f.emoji = patch.emoji
+    const flower = flowers.value.find(f => f.id === id)
+    if (!flower) return
+
+    if (patch.name) flower.name = toTitleCase(patch.name)
+    if (patch.emoji !== undefined) flower.emoji = patch.emoji
   }
 
   function deleteFlower(id: string) {
@@ -71,16 +83,31 @@ export const useFlowersStore = defineStore('flowers', () => {
   }
 
   function suggest(query: string, limit = 8): GlobalFlower[] {
-    if (!query.trim()) return flowers.value.slice(0, limit)
+    if (!query.trim()) {
+      return flowers.value.slice(0, limit)
+    }
+
     const q = query.toLowerCase()
+
     return flowers.value
       .filter(f => f.name.toLowerCase().includes(q))
       .slice(0, limit)
   }
 
-  return { flowers, flowerNames, load, findByName, addFlower, updateFlower, deleteFlower, suggest }
+  return {
+    flowers,
+    flowerNames,
+    load,
+    findByName,
+    addFlower,
+    updateFlower,
+    deleteFlower,
+    suggest,
+  }
 })
 
 function toTitleCase(str: string): string {
-  return str.trim().replace(/\w\S*/g, w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
+  return str
+    .trim()
+    .replace(/\w\S*/g, w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
 }
