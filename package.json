@@ -9,6 +9,7 @@
     "postinstall": "nuxt prepare"
   },
   "devDependencies": {
+    "@nuxtjs/supabase": "^2.0.9",
     "@nuxtjs/tailwindcss": "^6.12.0",
     "@pinia/nuxt": "^0.5.1",
     "nuxt": "^3.11.2",
@@ -20,6 +21,7 @@
     "@headlessui/vue": "^1.7.23",
     "@heroicons/vue": "^2.1.3",
     "@types/uuid": "^9.0.8",
+    "exceljs": "^4.4.0",
     "pinia": "^2.1.7",
     "uuid": "^9.0.1",
     "xlsx": "^0.18.5"

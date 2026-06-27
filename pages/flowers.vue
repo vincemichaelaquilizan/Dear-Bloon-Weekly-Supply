@@ -94,6 +94,10 @@ import type { GlobalFlower } from '~/types'
 const flowersStore = useFlowersStore()
 const { flowers } = storeToRefs(flowersStore)
 
+onMounted(async () => {
+  await flowersStore.load()
+})
+
 const showModal = ref(false)
 const editTarget = ref<GlobalFlower | null>(null)
 const form = reactive({ name: '', emoji: '' })
@@ -120,12 +124,12 @@ function closeModal() {
   editTarget.value = null
 }
 
-function save() {
+async function save() {
   if (!form.name.trim()) return
   if (editTarget.value) {
-    flowersStore.updateFlower(editTarget.value.id, { name: form.name, emoji: form.emoji || undefined })
+    await flowersStore.updateFlower(editTarget.value.id, { name: form.name, emoji: form.emoji || undefined })
   } else {
-    flowersStore.addFlower(form.name, form.emoji || undefined)
+    await flowersStore.addFlower(form.name, form.emoji || undefined)
   }
   closeModal()
 }
@@ -138,8 +142,8 @@ function confirmDelete(id: string) {
   showDeleteConfirm.value = true
 }
 
-function doDelete() {
-  if (deleteTargetId.value) flowersStore.deleteFlower(deleteTargetId.value)
+async function doDelete() {
+  if (deleteTargetId.value) await flowersStore.deleteFlower(deleteTargetId.value)
   showDeleteConfirm.value = false
   deleteTargetId.value = null
 }

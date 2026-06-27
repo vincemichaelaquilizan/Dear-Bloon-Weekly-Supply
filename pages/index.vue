@@ -1,3 +1,4 @@
+<!--pages/index.vue-->
 <template>
   <div class="animate-fade-in">
     <!-- Header -->
@@ -96,6 +97,11 @@ const newInput = ref<HTMLInputElement | null>(null)
 const showDeleteConfirm = ref(false)
 const deleteTargetId = ref<string | null>(null)
 
+onMounted(async () => {
+  await sessionsStore.load()
+  await ordersStore.load()
+})
+
 const filteredSessions = computed(() => {
   if (!searchQuery.value.trim()) return sessions.value
   const q = searchQuery.value.toLowerCase()
@@ -106,8 +112,9 @@ watch(showNewModal, (val) => {
   if (val) { newName.value = ''; nextTick(() => newInput.value?.focus()) }
 })
 
-function createSession() {
-  const session = sessionsStore.createSession(newName.value)
+async function createSession() {
+  const session = await sessionsStore.createSession(newName.value)
+  if (!session) return
   showNewModal.value = false
   router.push(`/session/${session.id}`)
 }
@@ -117,10 +124,10 @@ function confirmDelete(id: string) {
   showDeleteConfirm.value = true
 }
 
-function doDelete() {
+async function doDelete() {
   if (deleteTargetId.value) {
-    ordersStore.deleteOrdersBySession(deleteTargetId.value)
-    sessionsStore.deleteSession(deleteTargetId.value)
+    await ordersStore.deleteOrdersBySession(deleteTargetId.value)
+    await sessionsStore.deleteSession(deleteTargetId.value)
   }
   showDeleteConfirm.value = false
   deleteTargetId.value = null
@@ -129,13 +136,11 @@ function doDelete() {
 function handleExportSession(id: string) {
   const session = sessionsStore.getSession(id)
   if (!session) return
-  const csv = ordersStore.exportSessionToCSV(id, session.name)
-  ordersStore.downloadCSV(csv, `bloom-${session.name}.csv`)
+  ordersStore.exportSessionToExcel(id, session.name)
 }
 
 function handleExportAll() {
-  const csv = ordersStore.exportAllToCSV()
-  ordersStore.downloadCSV(csv, 'bloom-all-sessions.csv')
+  ordersStore.exportAllToExcel()
 }
 
 useSeoMeta({ title: 'Sessions — Bloom' })

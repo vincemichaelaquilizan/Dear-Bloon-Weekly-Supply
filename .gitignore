@@ -1,2 +1,5 @@
 .nuxt
+.env
+.output
+supabase
 node_modules

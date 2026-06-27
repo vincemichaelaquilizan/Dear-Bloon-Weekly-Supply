@@ -3,10 +3,17 @@ export default defineNuxtConfig({
   devtools: { enabled: true },
   modules: [
     '@nuxtjs/tailwindcss',
+    '@nuxtjs/supabase',
     '@pinia/nuxt',
   ],
-  pinia: {
-    autoImports: ['defineStore', 'storeToRefs'],
+  supabase: {
+    redirect: false,
+    clientOptions: {
+      auth: {
+        persistSession: false,    // don't save session to localStorage
+        autoRefreshToken: false,  // stop trying to refresh non-existent tokens
+      },
+    },
   },
   css: ['~/assets/css/main.css'],
   typescript: {

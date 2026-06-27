@@ -1,3 +1,4 @@
+<!--pages/order/[id].vue-->
 <template>
   <div v-if="order" class="animate-fade-in">
     <!-- Back + actions -->
@@ -8,7 +9,7 @@
       >
         ← {{ sessionName }}
       </NuxtLink>
-      <button @click="handleExport" class="btn-ghost text-sm">⬇ Export CSV</button>
+      <button @click="handleExport" class="btn-ghost text-sm">⬇ Export Excel</button>
     </div>
 
     <!-- Order header -->
@@ -45,7 +46,7 @@
           <div class="flex gap-2 mt-1">
             <button
               v-for="opt in cardOptions"
-              :key="opt.value"
+              :key="String(opt.value)"
               @click="setHasCard(opt.value)"
               :class="[
                 'flex-1 py-2 px-3 rounded-lg text-sm font-medium border transition-colors',
@@ -70,8 +71,9 @@
             <option value="">— Select —</option>
             <option value="cash">💵 Cash</option>
             <option value="gcash">📱 GCash</option>
-            <option value="card">💳 Card</option>
+            <option value="maya">📱 Maya</option>
             <option value="bank_transfer">🏦 Bank Transfer</option>
+            <option value="credit_card">💳 Credit Card</option>
           </select>
         </div>
 
@@ -85,7 +87,7 @@
           >
             <option value="">— Select —</option>
             <option value="pickup">🛍️ Pick-up</option>
-            <option value="delivery">🚚 Delivery</option>
+            <option value="delivery">🚚 Delivery (Lalamove)</option>
             <option value="rush_delivery">⚡ Rush Delivery</option>
           </select>
         </div>
@@ -99,10 +101,14 @@
             @change="savePlatform"
           >
             <option value="">— Select —</option>
-            <option value="walk_in">Threads</option>
-            <option value="facebook">Facebook Meta</option>
-            <option value="facebook">Tiktok</option>
+            <option value="threads">Threads</option>
+            <option value="facebook">Facebook</option>
             <option value="instagram">Instagram</option>
+            <option value="tiktok">TikTok</option>
+            <option value="viber">Viber</option>
+            <option value="whatsapp">WhatsApp</option>
+            <option value="walk_in">Walk-in</option>
+            <option value="other">Other</option>
           </select>
         </div>
       </div>
@@ -176,6 +182,11 @@ const orderId = route.params.id as string
 const ordersStore = useOrdersStore()
 const sessionsStore = useSessionsStore()
 
+onMounted(async () => {
+  await sessionsStore.load()
+  await ordersStore.loadBySession(route.params.id as string)
+})
+
 // ── Data ──────────────────────────────────────────────────────
 const order = computed(() => ordersStore.getOrder(orderId))
 const totalFlowers = computed(() => order.value ? ordersStore.totalFlowers(order.value) : 0)
@@ -188,8 +199,8 @@ const sessionName = computed(() => {
 const clientNameModel = ref('')
 watch(order, o => { if (o) clientNameModel.value = o.clientName }, { immediate: true })
 
-function saveClientName() {
-  ordersStore.updateOrderName(orderId, clientNameModel.value)
+async function saveClientName() {
+  await ordersStore.updateOrderName(orderId, clientNameModel.value)
 }
 
 // ── Has Card ──────────────────────────────────────────────────
@@ -198,31 +209,30 @@ const cardOptions = [
   { label: 'No',  value: false as boolean | null },
 ]
 
-function setHasCard(val: boolean | null) {
-  // Toggle off if same value is clicked
+async function setHasCard(val: boolean | null) {
   const next = order.value?.hasCard === val ? null : val
-  ordersStore.updateOrderMeta(orderId, { hasCard: next })
+  await ordersStore.updateOrderMeta(orderId, { hasCard: next })
 }
 
 // ── Payment ───────────────────────────────────────────────────
 const paymentModel = ref('')
 watch(order, o => { if (o) paymentModel.value = o.paymentMode }, { immediate: true })
-function savePayment() {
-  ordersStore.updateOrderMeta(orderId, { paymentMode: paymentModel.value as any })
+async function savePayment() {
+  await ordersStore.updateOrderMeta(orderId, { paymentMode: paymentModel.value as any })
 }
 
 // ── Delivery ──────────────────────────────────────────────────
 const deliveryModel = ref('')
 watch(order, o => { if (o) deliveryModel.value = o.deliveryMode }, { immediate: true })
-function saveDelivery() {
-  ordersStore.updateOrderMeta(orderId, { deliveryMode: deliveryModel.value as any })
+async function saveDelivery() {
+  await ordersStore.updateOrderMeta(orderId, { deliveryMode: deliveryModel.value as any })
 }
 
 // ── Platform ──────────────────────────────────────────────────
 const platformModel = ref('')
 watch(order, o => { if (o) platformModel.value = o.clientPlatform }, { immediate: true })
-function savePlatform() {
-  ordersStore.updateOrderMeta(orderId, { clientPlatform: platformModel.value as any })
+async function savePlatform() {
+  await ordersStore.updateOrderMeta(orderId, { clientPlatform: platformModel.value as any })
 }
 
 // ── Edit modal ────────────────────────────────────────────────
@@ -243,16 +253,16 @@ function confirmDeleteItem(id: string) {
   showDeleteItem.value = true
 }
 
-function doDeleteItem() {
-  if (deleteItemId.value) ordersStore.deleteFlowerItem(orderId, deleteItemId.value)
+async function doDeleteItem() {
+  if (deleteItemId.value) await ordersStore.deleteFlowerItem(orderId, deleteItemId.value)
   showDeleteItem.value = false
   deleteItemId.value = null
 }
 
 // ── Export ────────────────────────────────────────────────────
 function handleExport() {
-  const csv = ordersStore.exportOrderToCSV(orderId)
-  ordersStore.downloadCSV(csv, `bloom-order-${order.value?.clientName ?? orderId}.csv`)
+  if (!order.value) return
+  ordersStore.exportSessionToExcel(order.value.sessionId, sessionName.value)
 }
 
 function formatDate(iso: string) {

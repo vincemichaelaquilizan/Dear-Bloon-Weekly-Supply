@@ -5,7 +5,7 @@
       <NuxtLink to="/" class="flex items-center gap-1.5 text-sm text-gray-500 dark:text-gray-400 hover:text-bloom-600 dark:hover:text-bloom-400 transition-colors">
         ← All Sessions
       </NuxtLink>
-      <button @click="handleExport" class="btn-ghost text-sm">⬇ Export CSV</button>
+      <button @click="handleExport" class="btn-ghost text-sm">⬇ Export Excel</button>
     </div>
 
     <!-- Session name header -->
@@ -127,6 +127,12 @@ const ordersStore = useOrdersStore()
 const flowersStore = useFlowersStore()
 const router = useRouter()
 
+onMounted(async () => {
+  await sessionsStore.load()
+  await ordersStore.loadBySession(sessionId)
+  await flowersStore.load()
+})
+
 const session = computed(() => sessionsStore.getSession(sessionId))
 const sessionOrders = computed(() => ordersStore.getOrdersBySession(sessionId))
 const summary = computed(() => ordersStore.sessionSummary(sessionId))
@@ -134,8 +140,8 @@ const summary = computed(() => ordersStore.sessionSummary(sessionId))
 const sessionNameModel = ref('')
 watch(session, s => { if (s) sessionNameModel.value = s.name }, { immediate: true })
 
-function saveSessionName() {
-  sessionsStore.updateSession(sessionId, sessionNameModel.value)
+async function saveSessionName() {
+  await sessionsStore.updateSession(sessionId, sessionNameModel.value)
 }
 
 function getEmoji(name: string): string {
@@ -151,9 +157,10 @@ watch(showNewOrderModal, val => {
   if (val) { newClientName.value = ''; nextTick(() => newOrderInput.value?.focus()) }
 })
 
-function createOrder() {
-  const order = ordersStore.createOrder(sessionId, newClientName.value)
-  sessionsStore.touchSession(sessionId)
+async function createOrder() {
+  const order = await ordersStore.createOrder(sessionId, newClientName.value)
+  if (!order) return
+  await sessionsStore.touchSession(sessionId)
   showNewOrderModal.value = false
   router.push(`/order/${order.id}`)
 }
@@ -167,16 +174,15 @@ function confirmDeleteOrder(id: string) {
   showDeleteOrderConfirm.value = true
 }
 
-function doDeleteOrder() {
-  if (deleteOrderId.value) ordersStore.deleteOrder(deleteOrderId.value)
+async function doDeleteOrder() {
+  if (deleteOrderId.value) await ordersStore.deleteOrder(deleteOrderId.value)
   showDeleteOrderConfirm.value = false
   deleteOrderId.value = null
 }
 
 function handleExport() {
   if (!session.value) return
-  const csv = ordersStore.exportSessionToCSV(sessionId, session.value.name)
-  ordersStore.downloadCSV(csv, `bloom-${session.value.name}.csv`)
+  ordersStore.exportSessionToExcel(sessionId, session.value.name)
 }
 
 function formatDate(iso: string) {

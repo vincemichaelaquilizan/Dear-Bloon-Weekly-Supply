@@ -1,34 +1,34 @@
 export interface FlowerItem {
   id: string
-  name: string         // normalized, e.g. "Gerbera"
+  name: string
   quantity: number
 }
 
-export type PaymentMode = 'cash' | 'gcash' | 'card' | 'bank_transfer' | ''
-export type DeliveryMode = 'pickup' | 'delivery' | 'rush_delivery' | ''
-export type ClientPlatform = 'walk_in' | 'facebook' | 'instagram' | 'viber' | 'online_store' | 'other' | ''
+export type PaymentMode = 'cash' | 'gcash' | 'maya' | 'bank_transfer' | 'credit_card' | string
+export type DeliveryMode = 'pickup' | 'delivery' | 'rush_delivery' | string
+export type ClientPlatform = 'threads' | 'facebook' | 'instagram' | 'tiktok' | 'viber' | 'whatsapp' | 'walk_in' | 'other' | string
 
 export interface Order {
   id: string
-  sessionId: string    // which session this order belongs to
+  sessionId: string
   clientName: string
   flowerItems: FlowerItem[]
-  hasCard: boolean | null        // does the client want a card?
-  paymentMode: PaymentMode       // mode of payment
-  deliveryMode: DeliveryMode     // mode of delivery
-  clientPlatform: ClientPlatform // where the client came from
+  hasCard: boolean | null
+  paymentMode: PaymentMode
+  deliveryMode: DeliveryMode
+  clientPlatform: ClientPlatform
+  orderNotes: string           
   createdAt: string
   updatedAt: string
 }
 
 export interface Session {
   id: string
-  name: string         // e.g. "Saturday Walk-in", "Wedding June 28"
+  name: string
   createdAt: string
   updatedAt: string
 }
 
-/** Aggregated per-flower totals across a whole session */
 export interface SessionFlowerTally {
   name: string
   emoji?: string
