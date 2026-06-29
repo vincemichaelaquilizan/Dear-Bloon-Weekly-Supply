@@ -10,10 +10,15 @@
           <NuxtLink to="/" class="nav-link" active-class="nav-link-active" exact>Sessions</NuxtLink>
           <NuxtLink to="/flowers" class="nav-link" active-class="nav-link-active">Flowers</NuxtLink>
         </nav>
-        <button @click="toggle" class="p-2 rounded-lg text-gray-500 dark:text-gray-400 hover:bg-bloom-50 dark:hover:bg-gray-800 transition-colors">
-          <span v-if="isDark">☀️</span>
-          <span v-else>🌙</span>
-        </button>
+        <div class="flex items-center gap-2">
+          <button @click="toggle" class="p-2 rounded-lg text-gray-500 dark:text-gray-400 hover:bg-bloom-50 dark:hover:bg-gray-800 transition-colors">
+            <span v-if="isDark">☀️</span>
+            <span v-else>🌙</span>
+          </button>
+          <button @click="handleLogout" class="btn-ghost text-sm">
+            Sign Out
+          </button>
+        </div>
       </div>
     </header>
     <main class="max-w-6xl mx-auto px-4 sm:px-6 py-8">
@@ -23,6 +28,13 @@
 </template>
 <script setup lang="ts">
 const { isDark, toggle } = useTheme()
+const client = useSupabaseClient()
+const router = useRouter()
+
+const handleLogout = async () => {
+  await client.auth.signOut()
+  await router.push('/login')
+}
 </script>
 <style scoped>
 .nav-link {

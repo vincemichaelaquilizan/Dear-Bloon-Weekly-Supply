@@ -347,6 +347,22 @@ export const useOrdersStore = defineStore('orders', () => {
       }
     }
 
+    const grandTotal = breakdown.reduce((s, f) => s + f.total, 0)
+    const totalFlowersRow = ws1.addRow(['', '', '', '', '', '', 'Total Flowers', grandTotal, ''])
+    totalFlowersRow.eachCell(cell => {
+      cell.font = { bold: true, color: { argb: 'FFFFFFFF' } }
+      cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF7C3AED' } }
+      cell.alignment = { horizontal: 'center', vertical: 'middle' }
+      cell.border = {
+        top: { style: 'medium', color: { argb: 'FFB03260' } },
+        bottom: { style: 'medium', color: { argb: 'FFB03260' } },
+        left: { style: 'thin', color: { argb: 'FFF3E8F2' } },
+        right: { style: 'thin', color: { argb: 'FFF3E8F2' } },
+      }
+    })
+    totalFlowersRow.getCell(7).alignment = { horizontal: 'left' }
+    totalFlowersRow.getCell(8).font = { bold: true, color: { argb: 'FFFFFFFF' } }
+
     ws1.columns = [{ width: 5 }, { width: 22 }, { width: 11 }, { width: 18 }, { width: 22 }, { width: 16 }, { width: 20 }, { width: 7 }, { width: 28 }]
     ws1.getRow(1).height = 24
     ws1.getRow(2).height = 18
@@ -372,7 +388,6 @@ export const useOrdersStore = defineStore('orders', () => {
       }
     })
     ws2.getRow(3).height = 20
-    const grandTotal = breakdown.reduce((s, f) => s + f.total, 0)
     breakdown.forEach((item, i) => {
       const row = ws2.addRow([item.name, item.total, grandTotal > 0 ? `${((item.total / grandTotal) * 100).toFixed(1)}%` : '0%'])
       const isEven = i % 2 === 0
@@ -466,10 +481,12 @@ export const useOrdersStore = defineStore('orders', () => {
 
     const sessionsStore = useSessionsStore()
     let i = 0
+    let grandFlowerTotal = 0
     for (const order of orders.value) {
       const sessionName = sessionsStore.getSession(order.sessionId)?.name ?? order.sessionId.slice(0, 8)
       const flowers = order.flowerItems.length ? order.flowerItems : [{ name: '—', quantity: 0, id: '' }]
       for (const f of flowers) {
+        grandFlowerTotal += f.quantity || 0
         const row = ws.addRow([
           sessionName, order.clientName,
           order.hasCard === null ? '—' : order.hasCard ? 'Yes' : 'No',
@@ -489,6 +506,21 @@ export const useOrdersStore = defineStore('orders', () => {
       }
       i++
     }
+
+    const totalSummaryRow = ws.addRow(['', '', '', '', '', '', 'Total Flowers', grandFlowerTotal, '', ''])
+    totalSummaryRow.eachCell(cell => {
+      cell.font = { bold: true, color: { argb: 'FFFFFFFF' } }
+      cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF7C3AED' } }
+      cell.alignment = { horizontal: 'center', vertical: 'middle' }
+      cell.border = {
+        top: { style: 'medium', color: { argb: 'FFB03260' } },
+        bottom: { style: 'medium', color: { argb: 'FFB03260' } },
+        left: { style: 'thin', color: { argb: 'FFF3E8F2' } },
+        right: { style: 'thin', color: { argb: 'FFF3E8F2' } },
+      }
+    })
+    totalSummaryRow.getCell(7).alignment = { horizontal: 'left' }
+    totalSummaryRow.getCell(8).font = { bold: true, color: { argb: 'FFFFFFFF' } }
 
     ws.columns = [{ width: 20 }, { width: 22 }, { width: 10 }, { width: 16 }, { width: 22 }, { width: 14 }, { width: 20 }, { width: 7 }, { width: 28 }, { width: 14 }]
 
@@ -535,7 +567,9 @@ function styleDataRow(row: any, clientNum: number, ws: any) {
   row.eachCell((cell: any) => {
     cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: isEven ? 'FFFFF8FC' : 'FFFFFFFF' } }
     cell.border = {
+      top: { style: 'thin', color: { argb: 'FFF3E8F2' } },
       bottom: { style: 'hair', color: { argb: 'FFEDE9FE' } },
+      left: { style: 'thin', color: { argb: 'FFF3E8F2' } },
       right: { style: 'thin', color: { argb: 'FFFCE7F3' } },
     }
     cell.alignment = { vertical: 'middle', wrapText: true }
