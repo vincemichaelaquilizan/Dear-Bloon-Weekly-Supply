@@ -8,6 +8,8 @@ export type PaymentMode = 'cash' | 'gcash' | 'maya' | 'bank_transfer' | 'credit_
 export type DeliveryMode = 'pickup' | 'delivery' | 'rush_delivery' | string
 export type ClientPlatform = 'threads' | 'facebook' | 'instagram' | 'tiktok' | 'viber' | 'whatsapp' | 'walk_in' | 'other' | string
 
+export type OrderStatus = 'requested' | 'delivered' | 'received' | string
+
 export interface Order {
   id: string
   sessionId: string
@@ -17,6 +19,9 @@ export interface Order {
   paymentMode: PaymentMode
   deliveryMode: DeliveryMode
   clientPlatform: ClientPlatform
+  status: OrderStatus
+  deliveryFee?: number
+  selectedAddOns: AddOnItem[]
   orderNotes: string           
   createdAt: string
   updatedAt: string
@@ -47,6 +52,23 @@ export interface GlobalFlower {
   name: string
   color?: string
   emoji?: string
+  price?: number
+}
+
+export interface GlobalAddon {
+  id: string
+  label: string
+  description?: string
+  price?: number
+}
+
+export interface AddOnItem {
+  id: string
+  addonId: string
+  label: string
+  description?: string
+  price: number
+  quantity: number
 }
 
 export interface ParsedFlowerInput {

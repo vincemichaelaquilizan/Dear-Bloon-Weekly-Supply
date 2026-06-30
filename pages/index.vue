@@ -10,6 +10,7 @@
         </p>
       </div>
       <div class="flex items-center gap-2">
+        <NuxtLink to="/addons" class="btn-ghost">Add-ons</NuxtLink>
         <button v-if="sessions.length > 0" @click="handleExportAll" class="btn-ghost">
           ⬇ Export All
         </button>

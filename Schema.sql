@@ -7,6 +7,9 @@
 -- can be read or written.
 -- ─────────────────────────────────────────────
 
+-- Required extension for gen_random_uuid()
+create extension if not exists "pgcrypto";
+
 -- ── Sessions ──────────────────────────────────
 create table if not exists sessions (
   id          uuid primary key default gen_random_uuid(),
@@ -22,6 +25,12 @@ drop policy if exists "Public read sessions"   on sessions;
 drop policy if exists "Public insert sessions" on sessions;
 drop policy if exists "Public update sessions" on sessions;
 drop policy if exists "Public delete sessions" on sessions;
+
+-- Drop auth policies if they already exist
+drop policy if exists "Auth read sessions"   on sessions;
+drop policy if exists "Auth insert sessions" on sessions;
+drop policy if exists "Auth update sessions" on sessions;
+drop policy if exists "Auth delete sessions" on sessions;
 
 -- New auth-gated policies
 create policy "Auth read sessions"
@@ -50,6 +59,9 @@ create table if not exists orders (
   payment_mode     text not null default '',
   delivery_mode    text not null default '',
   client_platform  text not null default '',
+  status           text not null default 'requested',
+  delivery_fee     numeric not null default 0,
+  selected_addons  jsonb not null default '[]',
   order_notes      text not null default '',
   created_at       timestamptz not null default now(),
   updated_at       timestamptz not null default now()
@@ -61,6 +73,11 @@ drop policy if exists "Public read orders"   on orders;
 drop policy if exists "Public insert orders" on orders;
 drop policy if exists "Public update orders" on orders;
 drop policy if exists "Public delete orders" on orders;
+
+drop policy if exists "Auth read orders"   on orders;
+drop policy if exists "Auth insert orders" on orders;
+drop policy if exists "Auth update orders" on orders;
+drop policy if exists "Auth delete orders" on orders;
 
 create policy "Auth read orders"
   on orders for select
@@ -78,11 +95,19 @@ create policy "Auth delete orders"
   on orders for delete
   using (auth.uid() is not null);
 
+-- If you already have an existing database, run this to add the `status` column:
+alter table orders add column if not exists status text not null default 'requested';
+-- Add delivery fee to existing DBs:
+alter table orders add column if not exists delivery_fee numeric not null default 0;
+-- Add selected add-ons to existing DBs:
+alter table orders add column if not exists selected_addons jsonb not null default '[]';
+
 -- ── Flowers ───────────────────────────────────
 create table if not exists flowers (
   id          uuid primary key default gen_random_uuid(),
   name        text not null unique,
   emoji       text,
+  price       numeric not null default 0,
   created_at  timestamptz not null default now()
 );
 
@@ -92,6 +117,11 @@ drop policy if exists "Public read flowers"   on flowers;
 drop policy if exists "Public insert flowers" on flowers;
 drop policy if exists "Public update flowers" on flowers;
 drop policy if exists "Public delete flowers" on flowers;
+
+drop policy if exists "Auth read flowers"   on flowers;
+drop policy if exists "Auth insert flowers" on flowers;
+drop policy if exists "Auth update flowers" on flowers;
+drop policy if exists "Auth delete flowers" on flowers;
 
 create policy "Auth read flowers"
   on flowers for select
@@ -107,4 +137,44 @@ create policy "Auth update flowers"
 
 create policy "Auth delete flowers"
   on flowers for delete
+  using (auth.uid() is not null);
+
+-- Add price column to existing flowers table (if needed)
+alter table flowers add column if not exists price numeric not null default 0;
+
+-- ── Add-ons ──────────────────────────────────────────────────
+create table if not exists addons (
+  id          uuid primary key default gen_random_uuid(),
+  label       text not null,
+  description text not null default '',
+  price       numeric not null default 0,
+  created_at  timestamptz not null default now()
+);
+
+alter table addons enable row level security;
+
+drop policy if exists "Public read addons"   on addons;
+drop policy if exists "Public insert addons" on addons;
+drop policy if exists "Public update addons" on addons;
+drop policy if exists "Public delete addons" on addons;
+
+drop policy if exists "Auth read addons"   on addons;
+drop policy if exists "Auth insert addons" on addons;
+drop policy if exists "Auth update addons" on addons;
+drop policy if exists "Auth delete addons" on addons;
+
+create policy "Auth read addons"
+  on addons for select
+  using (auth.uid() is not null);
+
+create policy "Auth insert addons"
+  on addons for insert
+  with check (auth.uid() is not null);
+
+create policy "Auth update addons"
+  on addons for update
+  using (auth.uid() is not null);
+
+create policy "Auth delete addons"
+  on addons for delete
   using (auth.uid() is not null);

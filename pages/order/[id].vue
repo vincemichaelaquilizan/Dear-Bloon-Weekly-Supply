@@ -111,11 +111,43 @@
             <option value="other">Other</option>
           </select>
         </div>
+        
+          <!-- Status -->
+          <div>
+            <label class="form-label">Status</label>
+            <select
+              v-model="statusModel"
+              class="input w-full mt-1"
+              @change="saveStatus"
+            >
+              <option value="requested">Requested</option>
+              <option value="delivered">Delivered</option>
+              <option value="received">Received</option>
+            </select>
+          </div>
       </div>
 
       <p class="text-xs text-gray-400 dark:text-gray-600 mt-4">
         Created {{ formatDate(order.createdAt) }} · Last updated {{ formatDate(order.updatedAt) }}
       </p>
+
+      <div class="mt-4 grid grid-cols-1 sm:grid-cols-3 gap-3">
+        <div class="p-4 bg-gray-50 dark:bg-gray-800 rounded-lg">
+          <div class="text-xs text-gray-500">Subtotal</div>
+          <div class="font-semibold text-lg">{{ formatCurrency(subtotal) }}</div>
+        </div>
+        <div class="p-4 bg-gray-50 dark:bg-gray-800 rounded-lg" v-if="deliveryModel === 'delivery'">
+          <div class="text-xs text-gray-500">Delivery Fee (Lalamove)</div>
+          <div class="flex gap-2 mt-1">
+            <input v-model.number="deliveryFeeModel" @blur="saveDeliveryFee" type="number" min="0" step="0.25" class="input" />
+            <button @click="saveDeliveryFee" class="btn-ghost">Save</button>
+          </div>
+        </div>
+        <div class="p-4 bg-gray-50 dark:bg-gray-800 rounded-lg">
+          <div class="text-xs text-gray-500">Total</div>
+          <div class="font-semibold text-lg">{{ formatCurrency(total) }}</div>
+        </div>
+      </div>
     </div>
 
     <!-- Flower table -->
@@ -140,6 +172,55 @@
           @delete="confirmDeleteItem(item.id)"
         />
       </TransitionGroup>
+    </div>
+
+    <!-- Add-ons -->
+    <div class="bg-white dark:bg-gray-900 rounded-2xl border border-bloom-100 dark:border-gray-800 shadow-petal overflow-hidden mb-4">
+      <div class="grid grid-cols-[1fr_auto] gap-4 px-6 py-3 bg-bloom-50/60 dark:bg-gray-800/60 border-b border-bloom-100 dark:border-gray-800 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+        <span>Add-ons</span>
+        <span class="text-right">Price / Qty</span>
+      </div>
+      <div class="p-6 space-y-4">
+        <div class="grid gap-3 sm:grid-cols-[1.75fr_auto_80px]">
+          <select v-model="selectedAddOnId" class="input w-full">
+            <option value="">— Select add-on —</option>
+            <option v-for="addon in addons" :key="addon.id" :value="addon.id">
+              {{ addon.label }} — {{ formatCurrency(addon.price || 0) }}
+            </option>
+          </select>
+          <input v-model.number="addOnQuantity" type="number" min="1" class="input" />
+          <button @click="addSelectedAddOn" :disabled="!selectedAddOnId" class="btn-primary">Add</button>
+        </div>
+
+        <div v-if="order.selectedAddOns.length === 0" class="text-sm text-gray-500">No add-ons selected.</div>
+
+        <div v-else class="space-y-3">
+          <div
+            v-for="item in order.selectedAddOns"
+            :key="item.id"
+            class="grid grid-cols-[1fr_auto_auto] gap-3 p-4 rounded-xl bg-gray-50 dark:bg-gray-800 border border-gray-100 dark:border-gray-700"
+          >
+            <div>
+              <div class="font-medium text-gray-800 dark:text-gray-100">{{ item.label }}</div>
+              <div class="text-sm text-gray-500 dark:text-gray-400">{{ item.description || 'No description' }}</div>
+              <div class="text-sm text-gray-600 dark:text-gray-400">{{ formatCurrency(item.price) }} each</div>
+            </div>
+            <div class="flex items-center gap-2">
+              <label class="sr-only">Quantity</label>
+              <input
+                v-model.number="item.quantity"
+                @change="saveAddOnQuantity(item)"
+                type="number"
+                min="1"
+                class="input w-20"
+              />
+            </div>
+            <div class="flex items-center justify-end gap-2">
+              <button @click="removeAddOn(item.id)" class="btn-ghost text-sm">Remove</button>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
 
     <!-- Add flower input -->
@@ -175,25 +256,77 @@
 </template>
 
 <script setup lang="ts">
-import type { FlowerItem } from '~/types'
+import type { FlowerItem, AddOnItem } from '~/types'
 
 const route = useRoute()
 const orderId = route.params.id as string
 const ordersStore = useOrdersStore()
 const sessionsStore = useSessionsStore()
+const addonsStore = useAddonsStore()
 
 onMounted(async () => {
   await sessionsStore.load()
   await ordersStore.loadBySession(route.params.id as string)
+  await addonsStore.load()
 })
 
 // ── Data ──────────────────────────────────────────────────────
+const flowersStore = useFlowersStore()
 const order = computed(() => ordersStore.getOrder(orderId))
 const totalFlowers = computed(() => order.value ? ordersStore.totalFlowers(order.value) : 0)
+const addons = computed(() => addonsStore.addons)
+const selectedAddOnId = ref('')
+const addOnQuantity = ref(1)
 const sessionName = computed(() => {
   if (!order.value) return 'Session'
   return sessionsStore.getSession(order.value.sessionId)?.name ?? 'Session'
 })
+
+const subtotal = computed(() => {
+  if (!order.value) return 0
+  const flowerTotal = order.value.flowerItems.reduce((s, f) => {
+    const p = flowersStore.findByName(f.name)?.price ?? 0
+    return s + (p * (f.quantity || 0))
+  }, 0)
+  const addonTotal = order.value.selectedAddOns.reduce((s, a) => s + (a.price * (a.quantity || 0)), 0)
+  return flowerTotal + addonTotal
+})
+
+const deliveryFeeModel = ref(0)
+watch(order, o => { if (o) deliveryFeeModel.value = (o as any).deliveryFee ?? 0 }, { immediate: true })
+async function saveDeliveryFee() {
+  await ordersStore.updateOrderMeta(orderId, { deliveryFee: Number(deliveryFeeModel.value) })
+}
+
+const total = computed(() => subtotal.value + (Number(deliveryFeeModel.value) || 0))
+
+async function addSelectedAddOn() {
+  if (!selectedAddOnId.value || !order.value) return
+  const addon = addons.value.find(a => a.id === selectedAddOnId.value)
+  if (!addon) return
+  await ordersStore.addAddOnItem(orderId, {
+    addonId: addon.id,
+    label: addon.label,
+    description: addon.description,
+    price: addon.price ?? 0,
+  }, Number(addOnQuantity.value || 1))
+  selectedAddOnId.value = ''
+  addOnQuantity.value = 1
+}
+
+async function saveAddOnQuantity(item: AddOnItem) {
+  if (!order.value) return
+  await ordersStore.updateAddOnItem(orderId, item.id, { quantity: Number(item.quantity || 1) })
+}
+
+async function removeAddOn(itemId: string) {
+  await ordersStore.deleteAddOnItem(orderId, itemId)
+}
+
+function formatCurrency(v: number | { value?: number }) {
+  const val = typeof v === 'number' ? v : (v && (v as any).value) || 0
+  return new Intl.NumberFormat('en-PH', { style: 'currency', currency: 'PHP' }).format(val)
+}
 
 // ── Client name ───────────────────────────────────────────────
 const clientNameModel = ref('')
@@ -233,6 +366,13 @@ const platformModel = ref('')
 watch(order, o => { if (o) platformModel.value = o.clientPlatform }, { immediate: true })
 async function savePlatform() {
   await ordersStore.updateOrderMeta(orderId, { clientPlatform: platformModel.value as any })
+}
+
+// ── Status ───────────────────────────────────────────────────
+const statusModel = ref('requested')
+watch(order, o => { if (o) statusModel.value = (o as any).status ?? 'requested' }, { immediate: true })
+async function saveStatus() {
+  await ordersStore.updateOrderMeta(orderId, { status: statusModel.value as any })
 }
 
 // ── Edit modal ────────────────────────────────────────────────

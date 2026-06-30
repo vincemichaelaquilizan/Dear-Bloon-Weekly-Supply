@@ -9,6 +9,7 @@
         <nav class="flex items-center gap-1">
           <NuxtLink to="/" class="nav-link" active-class="nav-link-active" exact>Sessions</NuxtLink>
           <NuxtLink to="/flowers" class="nav-link" active-class="nav-link-active">Flowers</NuxtLink>
+          <NuxtLink to="/addons" class="nav-link" active-class="nav-link-active">Add-ons</NuxtLink>
         </nav>
         <div class="flex items-center gap-2">
           <button @click="toggle" class="p-2 rounded-lg text-gray-500 dark:text-gray-400 hover:bg-bloom-50 dark:hover:bg-gray-800 transition-colors">

@@ -3,11 +3,17 @@ export const config = {
 }
 
 export default defineNuxtRouteMiddleware(async (to) => {
-  const client = useSupabaseClient()
+  const sessionState = useSupabaseSession()
+  let session = sessionState.value
 
-  // getSession() returns { data: { session }, error }
-  // session is a plain object (or null), NOT a ref
-  const { data: { session } } = await client.auth.getSession()
+  if (!session) {
+    const client = useSupabaseClient()
+    const { data } = await client.auth.getSession()
+    session = data.session
+    if (session) {
+      sessionState.value = session
+    }
+  }
 
   // Allow access to login page without authentication
   if (to.path === '/login') {

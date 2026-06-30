@@ -25,6 +25,7 @@ export const useFlowersStore = defineStore('flowers', () => {
         id: row.id,
         name: row.name,
         emoji: row.emoji ?? undefined,
+        price: row.price !== undefined && row.price !== null ? Number(row.price) : 0,
       }))
     } catch (err) {
       console.error('Failed to load flowers:', err)
@@ -52,7 +53,7 @@ export const useFlowersStore = defineStore('flowers', () => {
   }
 
   // ── Mutations ─────────────────────────────────────────────────
-  async function addFlower(name: string, emoji?: string): Promise<GlobalFlower> {
+  async function addFlower(name: string, emoji?: string, price = 0): Promise<GlobalFlower> {
     const normalized = toTitleCase(name)
 
     const existing = findByName(normalized)
@@ -62,6 +63,7 @@ export const useFlowersStore = defineStore('flowers', () => {
       id: uuidv4(),
       name: normalized,
       emoji: emoji ?? null,
+      price: price ?? 0,
     }
 
     const { data, error } = await client
@@ -72,7 +74,7 @@ export const useFlowersStore = defineStore('flowers', () => {
 
     if (error) {
       console.error('Failed to add flower:', error)
-      const flower: GlobalFlower = { id: payload.id, name: normalized, emoji }
+      const flower: GlobalFlower = { id: payload.id, name: normalized, emoji, price: payload.price }
       flowers.value.push(flower)
       return flower
     }
@@ -81,6 +83,7 @@ export const useFlowersStore = defineStore('flowers', () => {
       id: data.id,
       name: data.name,
       emoji: data.emoji ?? undefined,
+      price: data.price !== undefined && data.price !== null ? Number(data.price) : 0,
     }
 
     flowers.value.push(flower)
@@ -94,6 +97,7 @@ export const useFlowersStore = defineStore('flowers', () => {
     const updates: Record<string, any> = {}
     if (patch.name !== undefined) updates.name = toTitleCase(patch.name)
     if (patch.emoji !== undefined) updates.emoji = patch.emoji
+    if (patch.price !== undefined) updates.price = patch.price
 
     const { error } = await client
       .from('flowers')
@@ -107,6 +111,7 @@ export const useFlowersStore = defineStore('flowers', () => {
 
     if (updates.name) flower.name = updates.name
     if (updates.emoji !== undefined) flower.emoji = updates.emoji
+    if (updates.price !== undefined) flower.price = updates.price
   }
 
   async function deleteFlower(id: string) {

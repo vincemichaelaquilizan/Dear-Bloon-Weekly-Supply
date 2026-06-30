@@ -13,9 +13,15 @@
     </button>
 
     <!-- Quantity badge -->
-    <div class="hidden sm:flex items-center gap-2">
-      <span class="qty-badge">{{ item.quantity }}</span>
-      <span class="text-xs text-gray-400 dark:text-gray-500">stem{{ item.quantity !== 1 ? 's' : '' }}</span>
+    <div class="hidden sm:flex items-center gap-3">
+      <div>
+        <span class="qty-badge">{{ item.quantity }}</span>
+        <div class="text-xs text-gray-400 dark:text-gray-500">stem{{ item.quantity !== 1 ? 's' : '' }}</div>
+      </div>
+      <div class="text-right">
+        <div class="text-sm font-medium">{{ formatCurrency(price) }} / stem</div>
+        <div class="text-xs text-gray-500">Total: {{ formatCurrency(lineTotal) }}</div>
+      </div>
     </div>
 
     <!-- Actions -->
@@ -46,6 +52,11 @@ defineEmits<{ edit: []; delete: [] }>()
 
 const flowersStore = useFlowersStore()
 const emoji = computed(() => flowersStore.findByName(props.item.name)?.emoji ?? '🌸')
+const price = computed(() => flowersStore.findByName(props.item.name)?.price ?? 0)
+const lineTotal = computed(() => (price.value || 0) * (props.item.quantity || 0))
+function formatCurrency(v: number) {
+  return new Intl.NumberFormat('en-PH', { style: 'currency', currency: 'PHP' }).format(v)
+}
 </script>
 
 <style scoped>

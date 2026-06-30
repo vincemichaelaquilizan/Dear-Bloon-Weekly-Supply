@@ -62,7 +62,15 @@
     <!-- Clients / Orders section -->
     <div class="flex items-center justify-between mb-4">
       <h2 class="font-serif text-xl text-gray-800 dark:text-white">Clients</h2>
-      <button @click="showNewOrderModal = true" class="btn-primary text-sm">+ Add Client</button>
+      <div class="flex items-center gap-3">
+        <select v-model="filterStatus" class="input text-sm">
+          <option value="all">All</option>
+          <option value="requested">Requested</option>
+          <option value="delivered">Delivered</option>
+          <option value="received">Received</option>
+        </select>
+        <button @click="showNewOrderModal = true" class="btn-primary text-sm">+ Add Client</button>
+      </div>
     </div>
 
     <div v-if="sessionOrders.length === 0" class="text-center py-12 bg-white dark:bg-gray-900 rounded-2xl border border-dashed border-bloom-200 dark:border-bloom-900">
@@ -134,7 +142,17 @@ onMounted(async () => {
 })
 
 const session = computed(() => sessionsStore.getSession(sessionId))
-const sessionOrders = computed(() => ordersStore.getOrdersBySession(sessionId))
+const filterStatus = ref('all')
+const sessionOrders = computed(() => {
+  const all = ordersStore.getOrdersBySession(sessionId)
+  // sort: requested (top), received (middle), delivered (last)
+  const sorted = all.slice().sort((a, b) => {
+    const orderRank = (s: string) => s === 'requested' ? 0 : s === 'received' ? 1 : 2
+    return orderRank((a as any).status ?? 'requested') - orderRank((b as any).status ?? 'requested')
+  })
+  if (!filterStatus.value || filterStatus.value === 'all') return sorted
+  return sorted.filter(o => ((o as any).status ?? 'requested') === filterStatus.value)
+})
 const summary = computed(() => ordersStore.sessionSummary(sessionId))
 
 const sessionNameModel = ref('')

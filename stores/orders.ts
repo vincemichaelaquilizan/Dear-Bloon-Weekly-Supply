@@ -2,7 +2,7 @@
 
 import { defineStore } from 'pinia'
 import { v4 as uuidv4 } from 'uuid'
-import type { Order, FlowerItem, SessionSummary, SessionFlowerTally } from '~/types'
+import type { Order, FlowerItem, AddOnItem, SessionSummary, SessionFlowerTally } from '~/types'
 
 export const useOrdersStore = defineStore('orders', () => {
   const client = useSupabaseClient<any>()
@@ -21,6 +21,18 @@ export const useOrdersStore = defineStore('orders', () => {
       paymentMode: row.payment_mode,
       deliveryMode: row.delivery_mode,
       clientPlatform: row.client_platform,
+      status: row.status ?? 'requested',
+      deliveryFee: row.delivery_fee !== undefined && row.delivery_fee !== null ? Number(row.delivery_fee) : 0,
+      selectedAddOns: Array.isArray(row.selected_addons)
+        ? row.selected_addons.map((item: any) => ({
+            id: item.id,
+            addonId: item.addonId,
+            label: item.label,
+            description: item.description ?? undefined,
+            price: item.price !== undefined && item.price !== null ? Number(item.price) : 0,
+            quantity: item.quantity !== undefined && item.quantity !== null ? Number(item.quantity) : 0,
+          }))
+        : [],
       orderNotes: row.order_notes,
       createdAt: row.created_at,
       updatedAt: row.updated_at,
@@ -117,7 +129,10 @@ export const useOrdersStore = defineStore('orders', () => {
       payment_mode: '',
       delivery_mode: '',
       client_platform: '',
+      status: 'requested',
+      delivery_fee: 0,
       order_notes: '',
+      selected_addons: [],
       created_at: now,
       updated_at: now,
     }
@@ -157,7 +172,7 @@ export const useOrdersStore = defineStore('orders', () => {
 
   async function updateOrderMeta(
     id: string,
-    patch: Partial<Pick<Order, 'hasCard' | 'paymentMode' | 'deliveryMode' | 'clientPlatform' | 'orderNotes'>>
+    patch: Partial<Pick<Order, 'hasCard' | 'paymentMode' | 'deliveryMode' | 'clientPlatform' | 'orderNotes' | 'status' | 'deliveryFee' | 'selectedAddOns'>>
   ) {
     const o = getOrder(id)
     if (!o) return
@@ -170,6 +185,9 @@ export const useOrdersStore = defineStore('orders', () => {
     if (patch.deliveryMode !== undefined)  dbPatch.delivery_mode = patch.deliveryMode
     if (patch.clientPlatform !== undefined) dbPatch.client_platform = patch.clientPlatform
     if (patch.orderNotes !== undefined)    dbPatch.order_notes = patch.orderNotes
+    if (patch.status !== undefined)        dbPatch.status = patch.status
+    if (patch.deliveryFee !== undefined)   dbPatch.delivery_fee = patch.deliveryFee
+    if (patch.selectedAddOns !== undefined) dbPatch.selected_addons = patch.selectedAddOns
 
     const { error } = await client
       .from('orders')
@@ -261,6 +279,79 @@ export const useOrdersStore = defineStore('orders', () => {
     order.updatedAt = updatedAt
   }
 
+  async function addAddOnItem(orderId: string, addon: Pick<AddOnItem, 'addonId' | 'label' | 'description' | 'price'>, quantity: number): Promise<AddOnItem | null> {
+    const order = getOrder(orderId)
+    if (!order) return null
+
+    const existing = order.selectedAddOns.find(item => item.addonId === addon.addonId)
+    if (existing) {
+      existing.quantity += quantity
+    } else {
+      order.selectedAddOns.push({
+        id: uuidv4(),
+        addonId: addon.addonId,
+        label: addon.label,
+        description: addon.description,
+        price: addon.price,
+        quantity,
+      })
+    }
+
+    const updatedAt = new Date().toISOString()
+
+    const { error } = await client
+      .from('orders')
+      .update({ selected_addons: order.selectedAddOns, updated_at: updatedAt })
+      .eq('id', orderId)
+
+    if (error) { console.error('Failed to add add-on item:', error); return null }
+
+    order.updatedAt = updatedAt
+    return existing ?? order.selectedAddOns[order.selectedAddOns.length - 1]
+  }
+
+  async function updateAddOnItem(orderId: string, itemId: string, patch: Partial<AddOnItem>) {
+    const order = getOrder(orderId)
+    if (!order) return
+
+    const item = order.selectedAddOns.find(i => i.id === itemId)
+    if (!item) return
+
+    if (patch.quantity !== undefined) item.quantity = Math.max(1, patch.quantity)
+    if (patch.label !== undefined) item.label = patch.label
+    if (patch.description !== undefined) item.description = patch.description
+    if (patch.price !== undefined) item.price = patch.price
+
+    const updatedAt = new Date().toISOString()
+
+    const { error } = await client
+      .from('orders')
+      .update({ selected_addons: order.selectedAddOns, updated_at: updatedAt })
+      .eq('id', orderId)
+
+    if (error) { console.error('Failed to update add-on item:', error); return }
+
+    order.updatedAt = updatedAt
+  }
+
+  async function deleteAddOnItem(orderId: string, itemId: string) {
+    const order = getOrder(orderId)
+    if (!order) return
+
+    order.selectedAddOns = order.selectedAddOns.filter(i => i.id !== itemId)
+
+    const updatedAt = new Date().toISOString()
+
+    const { error } = await client
+      .from('orders')
+      .update({ selected_addons: order.selectedAddOns, updated_at: updatedAt })
+      .eq('id', orderId)
+
+    if (error) { console.error('Failed to delete add-on item:', error); return }
+
+    order.updatedAt = updatedAt
+  }
+
   // ── Excel Export ──────────────────────────────────────────────
   async function exportSessionToExcel(sessionId: string, sessionName: string) {
     if (!import.meta.client) return
@@ -274,7 +365,7 @@ export const useOrdersStore = defineStore('orders', () => {
 
     const ws1 = wb.addWorksheet('Orders Detail')
 
-    ws1.mergeCells('A1:I1')
+    ws1.mergeCells('A1:J1')
     const titleCell = ws1.getCell('A1')
     titleCell.value = `📋 Session: ${sessionName}`
     titleCell.font = { bold: true, size: 14, color: { argb: 'FF7C3AED' } }
@@ -282,7 +373,7 @@ export const useOrdersStore = defineStore('orders', () => {
     titleCell.alignment = { vertical: 'middle', horizontal: 'center' }
     ws1.getRow(1).height = 28
 
-    ws1.mergeCells('A2:I2')
+    ws1.mergeCells('A2:J2')
     const dateCell = ws1.getCell('A2')
     dateCell.value = `Exported: ${new Date().toLocaleDateString('en-PH', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}`
     dateCell.font = { italic: true, size: 10, color: { argb: 'FF6B7280' } }
@@ -291,7 +382,7 @@ export const useOrdersStore = defineStore('orders', () => {
 
     ws1.addRow([])
 
-    const headers = ['#', 'Client Name', 'Has Card', 'Payment Mode', 'Delivery Mode', 'Platform', 'Flower', 'Qty', 'Notes']
+    const headers = ['#', 'Client Name', 'Has Card', 'Payment Mode', 'Delivery Mode', 'Platform', 'Delivery Status', 'Flower', 'Qty', 'Notes']
     const headerRow = ws1.addRow(headers)
     headerRow.eachCell(cell => {
       cell.font = { bold: true, color: { argb: 'FFFFFFFF' }, size: 11 }
@@ -309,36 +400,48 @@ export const useOrdersStore = defineStore('orders', () => {
     const platformLabel = (p: string) => ({ threads: 'Threads', facebook: 'Facebook', instagram: 'Instagram', tiktok: 'TikTok', viber: 'Viber', whatsapp: 'WhatsApp', walk_in: 'Walk-in', other: 'Other' }[p] ?? p)
     const paymentLabel = (p: string) => ({ cash: 'Cash', gcash: 'GCash', maya: 'Maya', bank_transfer: 'Bank Transfer', credit_card: 'Credit Card' }[p] ?? p)
     const deliveryLabel = (d: string) => ({ pickup: 'Pick-up', delivery: 'Delivery (Lalamove)', rush_delivery: 'Rush Delivery' }[d] ?? d)
+    const statusOptions = ['None', 'Deliver', 'Received']
+    const cardOptions = ['None', 'Yes', 'No']
+    const paymentOptions = ['Cash', 'GCash', 'Maya', 'Bank Transfer', 'Credit Card', '—']
+    const deliveryOptions = ['Pick-up', 'Delivery (Lalamove)', 'Rush Delivery', '—']
+    const platformOptions = ['Threads', 'Facebook', 'Instagram', 'TikTok', 'Viber', 'WhatsApp', 'Walk-in', 'Other', '—']
 
     for (const order of sessionOrders) {
       clientNum++
       const flowers = order.flowerItems
       const startRow = ws1.rowCount + 1
 
+      const cardValue = order.hasCard === null ? 'None' : order.hasCard ? 'Yes' : 'No'
+      const paymentValue = paymentLabel(order.paymentMode) || '—'
+      const deliveryValue = deliveryLabel(order.deliveryMode) || '—'
+      const platformValue = platformLabel(order.clientPlatform) || '—'
+      const statusValue = 'None'
+
       if (flowers.length === 0) {
-        const row = ws1.addRow([clientNum, order.clientName, order.hasCard === null ? '—' : order.hasCard ? '✓ Yes' : '✗ No', paymentLabel(order.paymentMode) || '—', deliveryLabel(order.deliveryMode) || '—', platformLabel(order.clientPlatform) || '—', '(no flowers)', '', order.orderNotes || ''])
+        const row = ws1.addRow([clientNum, order.clientName, cardValue, paymentValue, deliveryValue, platformValue, statusValue, '(no flowers)', '', order.orderNotes || ''])
         styleDataRow(row, clientNum, ws1)
       } else {
         flowers.forEach((flower, fi) => {
           const row = ws1.addRow([
             fi === 0 ? clientNum : '',
             fi === 0 ? order.clientName : '',
-            fi === 0 ? (order.hasCard === null ? '—' : order.hasCard ? '✓ Yes' : '✗ No') : '',
-            fi === 0 ? (paymentLabel(order.paymentMode) || '—') : '',
-            fi === 0 ? (deliveryLabel(order.deliveryMode) || '—') : '',
-            fi === 0 ? (platformLabel(order.clientPlatform) || '—') : '',
+            fi === 0 ? cardValue : '',
+            fi === 0 ? paymentValue : '',
+            fi === 0 ? deliveryValue : '',
+            fi === 0 ? platformValue : '',
+            fi === 0 ? statusValue : '',
             flower.name, flower.quantity,
             fi === 0 ? (order.orderNotes || '') : '',
           ])
           styleDataRow(row, clientNum, ws1)
-          const qtyCell = row.getCell(8)
+          const qtyCell = row.getCell(9)
           qtyCell.font = { bold: true, color: { argb: 'FF7C3AED' } }
           qtyCell.alignment = { horizontal: 'center' }
         })
 
         if (flowers.length > 1) {
           const endRow = startRow + flowers.length - 1
-          for (const col of [1, 2, 3, 4, 5, 6, 9]) {
+          for (const col of [1, 2, 3, 4, 5, 6, 7, 10]) {
             try { ws1.mergeCells(startRow, col, endRow, col) } catch {}
             const cell = ws1.getCell(startRow, col)
             cell.alignment = { vertical: 'middle', horizontal: col === 2 ? 'left' : 'center', wrapText: true }
@@ -347,8 +450,32 @@ export const useOrdersStore = defineStore('orders', () => {
       }
     }
 
+    const firstDataRow = 5
+    const lastDataRow = ws1.rowCount
+    for (let rowIndex = firstDataRow; rowIndex <= lastDataRow; rowIndex++) {
+      const row = ws1.getRow(rowIndex)
+      for (const col of [3, 4, 5, 6, 7]) {
+        const cell = row.getCell(col)
+        if (!cell) continue
+        cell.dataValidation = {
+          type: 'list',
+          allowBlank: true,
+          formulae: [
+            col === 3 ? `"${cardOptions.join(',')}"` :
+            col === 4 ? `"${paymentOptions.join(',')}"` :
+            col === 5 ? `"${deliveryOptions.join(',')}"` :
+            col === 6 ? `"${platformOptions.join(',')}"` :
+            `"${statusOptions.join(',')}"`
+          ],
+          showErrorMessage: true,
+          errorTitle: 'Invalid value',
+          error: 'Choose a value from the dropdown.',
+        }
+      }
+    }
+
     const grandTotal = breakdown.reduce((s, f) => s + f.total, 0)
-    const totalFlowersRow = ws1.addRow(['', '', '', '', '', '', 'Total Flowers', grandTotal, ''])
+    const totalFlowersRow = ws1.addRow(['', '', '', '', '', '', 'Total Flowers', grandTotal, '', ''])
     totalFlowersRow.eachCell(cell => {
       cell.font = { bold: true, color: { argb: 'FFFFFFFF' } }
       cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF7C3AED' } }
@@ -363,7 +490,7 @@ export const useOrdersStore = defineStore('orders', () => {
     totalFlowersRow.getCell(7).alignment = { horizontal: 'left' }
     totalFlowersRow.getCell(8).font = { bold: true, color: { argb: 'FFFFFFFF' } }
 
-    ws1.columns = [{ width: 5 }, { width: 22 }, { width: 11 }, { width: 18 }, { width: 22 }, { width: 16 }, { width: 20 }, { width: 7 }, { width: 28 }]
+    ws1.columns = [{ width: 5 }, { width: 22 }, { width: 11 }, { width: 18 }, { width: 22 }, { width: 16 }, { width: 16 }, { width: 20 }, { width: 7 }, { width: 28 }]
     ws1.getRow(1).height = 24
     ws1.getRow(2).height = 18
     ws1.getRow(3).height = 8
@@ -458,7 +585,7 @@ export const useOrdersStore = defineStore('orders', () => {
     wb.creator = 'Dear Bloom'
 
     const ws = wb.addWorksheet('All Orders')
-    ws.mergeCells('A1:J1')
+    ws.mergeCells('A1:K1')
     const t = ws.getCell('A1')
     t.value = '🌸 Dear Bloom — All Orders'
     t.font = { bold: true, size: 14, color: { argb: 'FFE05A9B' } }
@@ -467,7 +594,13 @@ export const useOrdersStore = defineStore('orders', () => {
     ws.getRow(1).height = 28
     ws.addRow([])
 
-    const hRow = ws.addRow(['Session', 'Client', 'Has Card', 'Payment', 'Delivery', 'Platform', 'Flower', 'Qty', 'Notes', 'Date'])
+    const statusOptions = ['None', 'Deliver', 'Received']
+    const cardOptions = ['None', 'Yes', 'No']
+    const paymentOptions = ['Cash', 'GCash', 'Maya', 'Bank Transfer', 'Credit Card', '—']
+    const deliveryOptions = ['Pick-up', 'Delivery (Lalamove)', 'Rush Delivery', '—']
+    const platformOptions = ['Threads', 'Facebook', 'Instagram', 'TikTok', 'Viber', 'WhatsApp', 'Walk-in', 'Other', '—']
+
+    const hRow = ws.addRow(['Session', 'Client', 'Has Card', 'Payment', 'Delivery', 'Platform', 'Delivery Status', 'Flower', 'Qty', 'Notes', 'Date'])
     hRow.eachCell(cell => {
       cell.font = { bold: true, color: { argb: 'FFFFFFFF' } }
       cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFB03260' } }
@@ -489,9 +622,9 @@ export const useOrdersStore = defineStore('orders', () => {
         grandFlowerTotal += f.quantity || 0
         const row = ws.addRow([
           sessionName, order.clientName,
-          order.hasCard === null ? '—' : order.hasCard ? 'Yes' : 'No',
+          order.hasCard === null ? 'None' : order.hasCard ? 'Yes' : 'No',
           order.paymentMode || '—', order.deliveryMode || '—',
-          order.clientPlatform || '—', f.name, f.quantity || '',
+          order.clientPlatform || '—', 'None', f.name, f.quantity || '',
           order.orderNotes || '',
           new Date(order.createdAt).toLocaleDateString('en-PH'),
         ])
@@ -507,7 +640,31 @@ export const useOrdersStore = defineStore('orders', () => {
       i++
     }
 
-    const totalSummaryRow = ws.addRow(['', '', '', '', '', '', 'Total Flowers', grandFlowerTotal, '', ''])
+    const firstDataRow = 4
+    const lastDataRow = ws.rowCount
+    for (let rowIndex = firstDataRow; rowIndex <= lastDataRow; rowIndex++) {
+      const row = ws.getRow(rowIndex)
+      for (const col of [3, 4, 5, 6, 7]) {
+        const cell = row.getCell(col)
+        if (!cell) continue
+        cell.dataValidation = {
+          type: 'list',
+          allowBlank: true,
+          formulae: [
+            col === 3 ? `"${cardOptions.join(',')}"` :
+            col === 4 ? `"${paymentOptions.join(',')}"` :
+            col === 5 ? `"${deliveryOptions.join(',')}"` :
+            col === 6 ? `"${platformOptions.join(',')}"` :
+            `"${statusOptions.join(',')}"`
+          ],
+          showErrorMessage: true,
+          errorTitle: 'Invalid value',
+          error: 'Choose a value from the dropdown.',
+        }
+      }
+    }
+
+    const totalSummaryRow = ws.addRow(['', '', '', '', '', '', 'Total Flowers', grandFlowerTotal, '', '', ''])
     totalSummaryRow.eachCell(cell => {
       cell.font = { bold: true, color: { argb: 'FFFFFFFF' } }
       cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF7C3AED' } }
@@ -522,7 +679,7 @@ export const useOrdersStore = defineStore('orders', () => {
     totalSummaryRow.getCell(7).alignment = { horizontal: 'left' }
     totalSummaryRow.getCell(8).font = { bold: true, color: { argb: 'FFFFFFFF' } }
 
-    ws.columns = [{ width: 20 }, { width: 22 }, { width: 10 }, { width: 16 }, { width: 22 }, { width: 14 }, { width: 20 }, { width: 7 }, { width: 28 }, { width: 14 }]
+    ws.columns = [{ width: 20 }, { width: 22 }, { width: 10 }, { width: 16 }, { width: 22 }, { width: 14 }, { width: 16 }, { width: 20 }, { width: 7 }, { width: 28 }, { width: 14 }]
 
     const buf = await wb.xlsx.writeBuffer()
     const blob = new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' })
@@ -552,6 +709,9 @@ export const useOrdersStore = defineStore('orders', () => {
     addFlowerItem,
     updateFlowerItem,
     deleteFlowerItem,
+    addAddOnItem,
+    updateAddOnItem,
+    deleteAddOnItem,
     exportSessionToExcel,
     exportAllToExcel,
   }

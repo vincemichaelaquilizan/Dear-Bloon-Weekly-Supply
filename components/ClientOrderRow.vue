@@ -8,6 +8,7 @@
       <div class="flex-1 min-w-0">
         <div class="flex items-center gap-2 mb-1.5">
           <span class="font-semibold text-gray-900 dark:text-white truncate">{{ order.clientName }}</span>
+          <span class="status-badge">{{ statusLabel }}</span>
           <span class="tally-pill shrink-0">🌸 {{ totalFlowers }}</span>
         </div>
         <div class="flex flex-wrap gap-1">
@@ -49,6 +50,10 @@ const initial = computed(() => props.order.clientName.trim()[0]?.toUpperCase() ?
 const PREVIEW = 3
 const previewItems = computed(() => props.order.flowerItems.slice(0, PREVIEW))
 const extraCount = computed(() => Math.max(0, props.order.flowerItems.length - PREVIEW))
+const statusLabel = computed(() => {
+  const s = (props.order as any).status ?? 'requested'
+  return s === 'requested' ? 'Requested' : s === 'delivered' ? 'Delivered' : s === 'received' ? 'Received' : s
+})
 </script>
 
 <style scoped>
@@ -75,5 +80,8 @@ const extraCount = computed(() => Math.max(0, props.order.flowerItems.length - P
 }
 .flower-chip-more {
   @apply bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400 border-gray-200 dark:border-gray-700;
+}
+.status-badge {
+  @apply text-xs font-semibold px-2 py-0.5 rounded-full bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300 border border-gray-200 dark:border-gray-700;
 }
 </style>

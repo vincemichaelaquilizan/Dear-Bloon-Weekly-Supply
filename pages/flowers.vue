@@ -4,10 +4,13 @@
       <div>
         <h1 class="font-serif text-3xl text-gray-900 dark:text-white">Flower Catalogue</h1>
         <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">
-          {{ flowers.length }} unique {{ flowers.length === 1 ? 'flower' : 'flowers' }}
+          {{ filteredFlowers.length }} unique {{ filteredFlowers.length === 1 ? 'flower' : 'flowers' }}
         </p>
       </div>
-      <button @click="openAdd" class="btn-primary">+ Add Flower</button>
+      <div class="flex items-center gap-3">
+        <input v-model="searchQuery" placeholder="Search flowers…" class="input text-sm" />
+        <button @click="openAdd" class="btn-primary">+ Add Flower</button>
+      </div>
     </div>
 
     <!-- Empty -->
@@ -20,13 +23,16 @@
     <!-- Flower Grid -->
     <div v-else class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
       <div
-        v-for="flower in flowers"
+        v-for="flower in filteredFlowers"
         :key="flower.id"
         class="flower-card group"
       >
         <div class="flex items-center gap-3 flex-1 min-w-0">
           <span class="text-2xl">{{ flower.emoji || '🌸' }}</span>
-          <span class="font-medium text-gray-800 dark:text-gray-200 truncate">{{ flower.name }}</span>
+          <div class="flex flex-col">
+            <span class="font-medium text-gray-800 dark:text-gray-200 truncate">{{ flower.name }}</span>
+            <span class="text-sm text-gray-500">{{ formatCurrency(flower.price || 0) }} / stem</span>
+          </div>
         </div>
         <div class="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
           <button
@@ -68,6 +74,10 @@
           maxlength="2"
         />
       </div>
+      <div>
+        <label class="form-label">Price per stem (PHP)</label>
+        <input v-model.number="form.price" type="number" min="0" step="0.25" class="input w-full" />
+      </div>
       <div class="flex justify-end gap-2 pt-2">
         <button @click="closeModal" class="btn-ghost">Cancel</button>
         <button @click="save" class="btn-primary" :disabled="!form.name.trim()">
@@ -100,13 +110,25 @@ onMounted(async () => {
 
 const showModal = ref(false)
 const editTarget = ref<GlobalFlower | null>(null)
-const form = reactive({ name: '', emoji: '' })
+const form = reactive({ name: '', emoji: '', price: 0 })
 const nameInput = ref<HTMLInputElement | null>(null)
+const searchQuery = ref('')
+
+const filteredFlowers = computed(() => {
+  const q = searchQuery.value.trim().toLowerCase()
+  if (!q) return flowers.value
+  return flowers.value.filter(f => f.name.toLowerCase().includes(q))
+})
+
+function formatCurrency(v: number) {
+  return new Intl.NumberFormat('en-PH', { style: 'currency', currency: 'PHP' }).format(v)
+}
 
 function openAdd() {
   editTarget.value = null
   form.name = ''
   form.emoji = ''
+  form.price = 0
   showModal.value = true
   nextTick(() => nameInput.value?.focus())
 }
@@ -115,6 +137,7 @@ function openEdit(flower: GlobalFlower) {
   editTarget.value = flower
   form.name = flower.name
   form.emoji = flower.emoji ?? ''
+  form.price = flower.price ?? 0
   showModal.value = true
   nextTick(() => nameInput.value?.focus())
 }
@@ -127,9 +150,9 @@ function closeModal() {
 async function save() {
   if (!form.name.trim()) return
   if (editTarget.value) {
-    await flowersStore.updateFlower(editTarget.value.id, { name: form.name, emoji: form.emoji || undefined })
+    await flowersStore.updateFlower(editTarget.value.id, { name: form.name, emoji: form.emoji || undefined, price: form.price })
   } else {
-    await flowersStore.addFlower(form.name, form.emoji || undefined)
+    await flowersStore.addFlower(form.name, form.emoji || undefined, form.price)
   }
   closeModal()
 }

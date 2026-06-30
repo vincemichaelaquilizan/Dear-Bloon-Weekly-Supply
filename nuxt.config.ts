@@ -6,17 +6,6 @@ export default defineNuxtConfig({
     '@nuxtjs/supabase',
     '@pinia/nuxt',
   ],
-  supabase: {
-    redirect: false,
-    clientOptions: {
-      auth: {
-        persistSession: true,       // store session in localStorage
-        autoRefreshToken: true,     // keep the session alive automatically
-        detectSessionInUrl: true,   // needed for magic links / OAuth callbacks
-        storageKey: 'sb-auth',      // explicit key for reliable persistence
-      },
-    },
-  },
   css: ['~/assets/css/main.css'],
   typescript: {
     strict: true,
