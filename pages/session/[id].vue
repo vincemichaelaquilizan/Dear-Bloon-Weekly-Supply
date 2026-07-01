@@ -60,16 +60,34 @@
     </div>
 
     <!-- Clients / Orders section -->
-    <div class="flex items-center justify-between mb-4">
-      <h2 class="font-serif text-xl text-gray-800 dark:text-white">Clients</h2>
-      <div class="flex items-center gap-3">
-        <select v-model="filterStatus" class="input text-sm">
-          <option value="all">All</option>
-          <option value="requested">Requested</option>
-          <option value="delivered">Delivered</option>
-          <option value="received">Received</option>
-        </select>
-        <button @click="showNewOrderModal = true" class="btn-primary text-sm">+ Add Client</button>
+    <div class="mb-4 rounded-2xl border border-bloom-100/80 bg-white/80 p-4 shadow-sm backdrop-blur dark:border-gray-800 dark:bg-gray-900/80">
+      <div class="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+        <div class="flex items-center gap-2">
+          <h2 class="font-serif text-xl text-gray-800 dark:text-white">Clients</h2>
+          <span class="rounded-full bg-bloom-50 px-2.5 py-1 text-xs font-semibold text-bloom-700 dark:bg-bloom-950/40 dark:text-bloom-300">
+            {{ sessionOrders.length }} shown
+          </span>
+        </div>
+
+        <div class="flex flex-col gap-3 sm:flex-row sm:items-center">
+          <div class="flex flex-wrap gap-2">
+            <button
+              v-for="option in statusFilterOptions"
+              :key="option.value"
+              type="button"
+              @click="filterStatus = option.value"
+              :class="[
+                'rounded-full border px-3 py-2 text-sm font-medium transition-all',
+                filterStatus === option.value
+                  ? 'border-bloom-600 bg-bloom-600 text-white shadow-petal'
+                  : 'border-gray-200 bg-white text-gray-600 hover:border-bloom-300 hover:text-bloom-700 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300 dark:hover:border-bloom-700 dark:hover:text-bloom-300'
+              ]"
+            >
+              {{ option.label }}
+            </button>
+          </div>
+          <button @click="showNewOrderModal = true" class="btn-primary text-sm">+ Add Client</button>
+        </div>
       </div>
     </div>
 
@@ -143,6 +161,12 @@ onMounted(async () => {
 
 const session = computed(() => sessionsStore.getSession(sessionId))
 const filterStatus = ref('all')
+const statusFilterOptions = [
+  { value: 'all', label: 'All' },
+  { value: 'requested', label: 'Requested' },
+  { value: 'delivered', label: 'Delivered' },
+  { value: 'received', label: 'Received' },
+]
 const sessionOrders = computed(() => {
   const all = ordersStore.getOrdersBySession(sessionId)
   // sort: requested (top), received (middle), delivered (last)
